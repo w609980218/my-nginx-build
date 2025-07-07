@@ -1,47 +1,49 @@
-name: Build OpenWrt with proxy_connect
+name: Build OpenWrt Nginx with proxy_connect_module
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-openwrt:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
+  build:
+    runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout OpenWrt source
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential clang flex gawk gcc-multilib \
+            gettext git libncurses-dev libssl-dev python3-distutils rsync unzip \
+            zlib1g-dev file wget python3 python3-pip python3-setuptools subversion
+
+    - name: Clone OpenWrt source
       run: |
         git clone --depth=1 https://github.com/openwrt/openwrt.git
         cd openwrt
-        # 切你需要的版本或分支，例如：
-        # git checkout openwrt-24.10
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
-    - name: Clone ngx_http_proxy_connect_module
+    - name: Add ngx_http_proxy_connect_module
       run: |
         cd openwrt/package
         git clone https://github.com/chobits/ngx_http_proxy_connect_module.git
 
-    - name: Install build dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc unzip python3 python3-distutils zlib1g-dev file wget
-
-    - name: Prepare config
+    - name: Configure nginx with proxy connect support
       run: |
         cd openwrt
-        # 生成默认配置（你可以先准备一个.config文件放仓库用 checkout）
+        echo "CONFIG_PACKAGE_nginx=y" >> .config
+        echo "CONFIG_PACKAGE_nginx-ssl=y" >> .config
+        echo "CONFIG_PACKAGE_nginx-mod-http-lua=y" >> .config
+        echo "CONFIG_PACKAGE_nginx-mod-http-proxy-connect=y" >> .config
         make defconfig
-        # 如果你有自定义配置，这里替换为：
-        # cp ../your_config .config
-        # make defconfig
 
-    - name: Build OpenWrt firmware
+    - name: Build .ipk packages
       run: |
         cd openwrt
-        make -j$(nproc)
+        make -j$(nproc) package/nginx/compile V=s
 
-    - name: Upload firmware artifact
-      uses: actions/upload-artifact@v3
+    - name: Upload compiled .ipk
+      uses: actions/upload-artifact@v4
       with:
-        name: openwrt-firmware
-        path: openwrt/bin/targets/
+        name: nginx-ipk
+        path: |
+          openwrt/bin/packages/*/base/nginx*proxy-connect*.ipk
