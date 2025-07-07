@@ -36,8 +36,9 @@ jobs:
         make package/nginx/compile V=s
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: nginx-ssl-ipk
         path: |
           bin/packages/x86_64/base/nginx-ssl*.ipk
+
