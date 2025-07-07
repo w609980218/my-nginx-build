@@ -24,7 +24,7 @@ jobs:
 
     - name: Add ngx_http_proxy_connect_module
       run: |
-        cd openwrt/package
+        cd openwrt/package  # 确保进入正确的目录
         git clone https://github.com/chobits/ngx_http_proxy_connect_module.git
 
     - name: Configure nginx with proxy connect support
