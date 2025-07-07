@@ -3,11 +3,26 @@ name: Build OpenWrt Nginx with proxy_connect_module
 on:
   workflow_dispatch:
 
+env:
+  CACHE_KEY: ${{ runner.os }}-openwrt-${{ hashFiles('**/feeds.conf.default') }}
+
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Cache OpenWrt source and downloads
+      uses: actions/cache@v3
+      id: cache
+      with:
+        path: |
+          openwrt
+          dl
+        key: ${{ env.CACHE_KEY }}
+
     - name: Install dependencies
       run: |
         sudo apt update
@@ -15,16 +30,14 @@ jobs:
             gettext git libncurses-dev libssl-dev python3-distutils rsync unzip \
             zlib1g-dev file wget python3 python3-pip python3-setuptools subversion
 
-    - name: Clone OpenWrt source
+    - name: Clone OpenWrt source (if not cached)
+      if: steps.cache.outputs.cache-hit != 'true'
       run: |
         git clone --depth=1 https://github.com/openwrt/openwrt.git
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-
-    - name: Add ngx_http_proxy_connect_module
-      run: |
-        cd openwrt/package  # 确保进入正确的目录
+        cd package
         git clone https://github.com/chobits/ngx_http_proxy_connect_module.git
 
     - name: Configure nginx with proxy connect support
@@ -45,5 +58,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: nginx-ipk
-        path: |
-          openwrt/bin/packages/*/base/nginx*proxy-connect*.ipk
+        path: openwrt/bin/packages/*/base/nginx*proxy-connect*.ipk
