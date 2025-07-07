@@ -14,7 +14,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Cache OpenWrt source and downloads
+    - name: Cache OpenWrt
       uses: actions/cache@v3
       id: cache
       with:
@@ -30,31 +30,36 @@ jobs:
             gettext git libncurses-dev libssl-dev python3-distutils rsync unzip \
             zlib1g-dev file wget python3 python3-pip python3-setuptools subversion
 
-    - name: Clone OpenWrt source (if not cached)
+    - name: Setup OpenWrt
       if: steps.cache.outputs.cache-hit != 'true'
       run: |
         git clone --depth=1 https://github.com/openwrt/openwrt.git
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
+        mkdir -p package
         cd package
         git clone https://github.com/chobits/ngx_http_proxy_connect_module.git
+        cd ..
 
-    - name: Configure nginx with proxy connect support
+    - name: Configure Nginx
       run: |
         cd openwrt
+        [ ! -d "package/ngx_http_proxy_connect_module" ] && \
+          git clone https://github.com/chobits/ngx_http_proxy_connect_module.git package/ngx_http_proxy_connect_module
+        
         echo "CONFIG_PACKAGE_nginx=y" >> .config
         echo "CONFIG_PACKAGE_nginx-ssl=y" >> .config
         echo "CONFIG_PACKAGE_nginx-mod-http-lua=y" >> .config
         echo "CONFIG_PACKAGE_nginx-mod-http-proxy-connect=y" >> .config
         make defconfig
 
-    - name: Build .ipk packages
+    - name: Build packages
       run: |
         cd openwrt
         make -j$(nproc) package/nginx/compile V=s
 
-    - name: Upload compiled .ipk
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: nginx-ipk
