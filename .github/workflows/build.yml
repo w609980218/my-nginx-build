@@ -1,0 +1,43 @@
+name: Build nginx with proxy-connect
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Set up environment
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential libncurses5-dev gawk git subversion \
+          libssl-dev gettext unzip file libelf-dev ecj fastjar java-propose-classpath \
+          libncursesw5-dev python3
+
+    - name: Clone SDK
+      run: |
+        git clone https://github.com/immortalwrt/immortalwrt.git
+        cd immortalwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        make defconfig
+
+    - name: Add proxy connect module
+      run: |
+        cd package
+        git clone https://github.com/chobits/ngx_http_proxy_connect_module.git
+
+    - name: Start build
+      run: |
+        cd immortalwrt
+        make package/nginx/compile V=s
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: nginx-ssl-ipk
+        path: |
+          bin/packages/x86_64/base/nginx-ssl*.ipk
